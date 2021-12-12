@@ -7,7 +7,7 @@
 
 int main(int argc, char const *argv[])
 {
-    YAML::Node config = YAML::LoadFile("/home/ziyi/code/ltl_ws/src/ltl_automation_a1/config/a1_ts.yaml");
+    YAML::Node config = YAML::LoadFile("/home/ziyi/code/ltl_ws/src/ltl_automaton_bt/config/a1_ts.yaml");
 
     if (config["SOMETHING"]) {
         std::cout << config["SOMETHING"] << "\n";

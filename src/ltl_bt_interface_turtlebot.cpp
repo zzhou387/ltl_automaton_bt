@@ -1,5 +1,5 @@
 //
-// Created by ziyi on 7/8/21.
+// Created by ziyi on 8/9/21.
 //
 
 #include <ros/ros.h>
@@ -17,10 +17,9 @@
 #include "navigation_node.h"
 #include <yaml-cpp/yaml.h>
 #include <ros/package.h>
-#include "quadruped_ctrl/locomotion_status.h"
-#include "ltl_automation_a1/LTLTrace.h"
-#include "ltl_automation_a1/LTLStateLoadDisturb.h"
-#include "ltl_automation_a1/LTLFakeInput.h"
+#include "ltl_automaton_bt/LTLTrace.h"
+#include "ltl_automaton_bt/LTLStateLoadDisturb.h"
+#include "ltl_automaton_bt/LTLFakeInput.h"
 
 typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> Client;
 
@@ -31,8 +30,7 @@ public:
     LTLA1Planner(){
         client_ = std::make_shared<Client>("/move_base", true);
         task_sub_ = nh_.subscribe("/action_plan", 1, &LTLA1Planner::callbackActionSequence, this);
-        loco_status_sub_ = nh_.subscribe("/locomotion_status", 1, &LTLA1Planner::callbackLocomotionStatus, this);
-        ltl_state_pub_ = nh_.advertise<ltl_automaton_msgs::TransitionSystemStateStamped>("ts_state", 10, true);
+        ltl_state_pub_ = nh_.advertise<ltl_automaton_msgs::TransitionSystemStateStamped>("/ts_state", 10, true);
         replanning_request_ = nh_.advertise<std_msgs::Int8>("replanning_request", 1);
         ltl_trace_pub_ = nh_.advertise<ltl_automaton_msgs::LTLPlan>("ltl_trace", 10, true);
         ros::ServiceServer service = nh_.advertiseService("synchronization_service", &LTLA1Planner::callbackLTLTrace, this);
@@ -44,25 +42,22 @@ public:
     }
     ~LTLA1Planner() = default;
     void init_params(){
-        std::string package_name = "ltl_automation_a1";
+        std::string package_name = "ltl_automaton_bt";
         std::string package_name_2 = "ltl_automaton_planner";
         // Get default tree from param
         auto aaa = ros::package::getPath(package_name);
-        bt_filepath = ros::package::getPath(package_name).append("/resources/replanning_tree_quadruped_fake.xml");
+        bt_filepath = ros::package::getPath(package_name).append("/resources/replanning_tree_delivery_fake.xml");
 //        nh_.getParam("bt_filepath", bt_filepath);
         ROS_INFO("tree file: %s\n", bt_filepath.c_str());
 
         // Get TS for param
         std::string ts_filepath;
-        ts_filepath = ros::package::getPath(package_name_2).append("/config/ts_quadruped.yaml");
+        ts_filepath = ros::package::getPath(package_name_2).append("/config/ts_turtlebot_test.yaml");
 //        nh_.getParam("transition_system_textfile", ts_filepath);
         transition_system_ = YAML::LoadFile(ts_filepath);
 
         // Init ltl state message with TS
         ltl_state_msg_.ts_state.state_dimension_names = transition_system_["state_dim"].as<std::vector<std::string>>();
-
-        // Init locomotion status: 0: current_FSM; 1: operating mode
-        loco_status = std::vector<std::string>(2, "NONE");
 
         // Initialize the flags for the replanning logic
         is_first = true;
@@ -79,11 +74,11 @@ public:
             auto dimension = transition_system_["state_dim"].as<std::vector<std::string>>()[i];
             if(dimension == "2d_pose_region"){
                 a1_region_sub_ = nh_.subscribe("current_region", 100, &LTLA1Planner::region_state_callback, this);
-            } else if (dimension == "A1_load") {
-                // always initialize as standby for now
+            } else if (dimension == "DR_load") {
+                // always initialize as unloaded for now
                 current_ltl_state_[i] = "standby";
             } else {
-                std::cout <<"state type " << dimension << " is not supported by LTL A1" << std::endl;
+                std::cout <<"state type " << dimension << " is not supported by DR TS" << std::endl;
             }
         }
 
@@ -96,8 +91,8 @@ public:
         // additional argument for updating BT action types
         NodeBuilder builder_ts =
                 [this](const std::string& name, const NodeConfiguration& config)
-                {
-                    return std::make_unique<BTNav::UpdateLTL>( name, config, transition_system_);
+        {
+            return std::make_unique<BTNav::UpdateLTL>( name, config, transition_system_);
         };
 
         factory_.registerNodeType<BTNav::MoveAction>("MoveAction");
@@ -108,11 +103,6 @@ public:
         factory_.registerNodeType<BTNav::SynchronizedTransitionAction>("SynchronizedTransitionAction");
         factory_.registerNodeType<BTNav::PickAction>("PickAction");
         factory_.registerNodeType<BTNav::DropAction>("DropAction");
-        factory_.registerNodeType<BTNav::GuideAction>("GuideAction");
-        factory_.registerNodeType<BTNav::BackNormalAction>("BackNormalAction");
-        factory_.registerNodeType<BTNav::LocomotionStart>("LocomotionStart");
-        factory_.registerNodeType<BTNav::LocomotionStatusCheck>("LocomotionStatusCheck");
-        factory_.registerNodeType<BTNav::RecoveryStand>("RecoveryStand");
         factory_.registerNodeType<BTNav::ReplanningRequestLevel1>("ReplanningRequestLevel1");
         factory_.registerNodeType<BTNav::ReplanningRequestLevel2>("ReplanningRequestLevel2");
         factory_.registerNodeType<BTNav::ReplanningRequestLevel3>("ReplanningRequestLevel3");
@@ -127,18 +117,17 @@ public:
         my_blackboard_->set("ltl_state_desired_sequence", "NONE");
         my_blackboard_->set("ltl_state_executed_sequence", "NONE");
         my_blackboard_->set("bt_action_type", "NONE");
-        my_blackboard_->set("goal_sent", false);
+        my_blackboard_->set("goal_sent", true);
         my_blackboard_->set("action_sequence", "NONE");
         my_blackboard_->set("action_sequence_executed", "NONE");
         my_blackboard_->set("num_cycles", 1);
-        my_blackboard_->set("locomotion_status", "NONE");
         my_blackboard_->set("replanning_request", 0);
         my_blackboard_->set("replanning_fake_input", 0);
         my_blackboard_->debugMessage();
 
 //        auto tree = std::make_unique<BT::Tree>();
         auto tree = std::make_unique<BT::Tree>(factory_.createTreeFromFile(bt_filepath, my_blackboard_));
-        auto zmq_publisher = std::make_unique<PublisherZMQ>(*tree);
+//        auto zmq_publisher = std::make_unique<PublisherZMQ>(*tree);
         NodeStatus status = NodeStatus::RUNNING;
 
         // Send the initial LTL state
@@ -155,10 +144,10 @@ public:
                 is_first = false;
                 replan = false;
             } else if (!is_first && replan) {
-                zmq_publisher.reset();
+//                zmq_publisher.reset();
                 status = NodeStatus::RUNNING;
                 tree = std::make_unique<BT::Tree>(factory_.createTreeFromFile(bt_filepath, my_blackboard_));
-                zmq_publisher = std::make_unique<PublisherZMQ>(*tree);
+//                zmq_publisher = std::make_unique<PublisherZMQ>(*tree);
                 ROS_WARN("BEHAVIOR TREE RELOADED");
                 replan = false;
             } else if (is_first && !replan){
@@ -217,7 +206,6 @@ public:
                         if (current_action == "NONE") {
                             ROS_ERROR("No goal is set");
                         } else {
-                            ROS_WARN("Set goal here");
                             for (YAML::const_iterator iter = transition_system_["actions"].begin();
                                  iter != transition_system_["actions"].end(); ++iter) {
                                 if (iter->first.as<std::string>() == current_action) {
@@ -235,10 +223,6 @@ public:
                         }
                     }
                 }
-                // Other actions; not needed at this moment; simply put into SynchroNode
-//                if (action == "")
-
-
                 // publish the replanning status and ltl current state back to the ltl planner
                 int replanning_stat;
                 my_blackboard_->get(std::string("replanning_request"), replanning_stat);
@@ -320,7 +304,7 @@ public:
         if(!action_sequence.empty()){
             current_action = action_sequence[0];
             for (YAML::const_iterator iter = transition_system_["actions"].begin();
-                 iter != transition_system_["actions"].end(); ++iter) {
+                iter != transition_system_["actions"].end(); ++iter) {
                 if (iter->first.as<std::string>() == current_action) {
                     action_dict = transition_system_["actions"][iter->first.as<std::string>()];
                     bt_action_type = action_dict["type"].as<std::string>();
@@ -394,14 +378,8 @@ public:
         my_blackboard_->set("ltl_state_current", current_ltl_state_);
     }
 
-    void callbackLocomotionStatus(const quadruped_ctrl::locomotion_status& msg){
-        loco_status[0] = msg.current_fsm;
-        loco_status[1] = msg.operating_mode;
-        my_blackboard_->set("locomotion_status", loco_status);
-    }
-
-    bool callbackLTLTrace(ltl_automation_a1::LTLTraceRequest &req,
-                          ltl_automation_a1::LTLTraceResponse &res){
+    bool callbackLTLTrace(ltl_automaton_bt::LTLTraceRequest &req,
+                          ltl_automaton_bt::LTLTraceResponse &res){
         if(req.request == 1){
             // Get the current action and TS state history
             BT::LTLState_Sequence state_trace;
@@ -438,8 +416,8 @@ public:
         return true;
     }
 
-    bool callbackLTLStateLoadDisturb(ltl_automation_a1::LTLStateLoadDisturbRequest &req,
-                                 ltl_automation_a1::LTLStateLoadDisturbResponse &res){
+    bool callbackLTLStateLoadDisturb(ltl_automaton_bt::LTLStateLoadDisturbRequest &req,
+                                     ltl_automaton_bt::LTLStateLoadDisturbResponse &res){
         if(req.request == 1){
             current_ltl_state_[1] = "standby";
             ROS_WARN("Load state changed to standby");
@@ -453,8 +431,8 @@ public:
         return true;
     }
 
-    bool callbackLTLFakeInput(ltl_automation_a1::LTLFakeInput::Request &req,
-                              ltl_automation_a1::LTLFakeInput::Response &res){
+    bool callbackLTLFakeInput(ltl_automaton_bt::LTLFakeInput::Request &req,
+                              ltl_automaton_bt::LTLFakeInput::Response &res){
 
         if(req.request < 4){
             fake_input_ = int(req.request);
@@ -485,11 +463,9 @@ private:
     ltl_automaton_msgs::TransitionSystemStateStamped  ltl_state_msg_;
     ltl_automaton_msgs::LTLPlan ltl_trace_msg_;
     YAML::Node transition_system_;
-    std::vector<std::string> loco_status;
 
     ros::Subscriber task_sub_;
     ros::Subscriber a1_region_sub_;
-    ros::Subscriber loco_status_sub_;
     ros::Publisher ltl_state_pub_;
     ros::Publisher ltl_trace_pub_;
     ros::Publisher replanning_request_;
@@ -503,7 +479,7 @@ private:
 };
 
 int main(int argc, char** argv){
-    ros::init(argc, argv, "a1_ltl_bt");
+    ros::init(argc, argv, "turtlebot_ltl_bt");
     LTLA1Planner runner;
     ros::spin();
     return 0;

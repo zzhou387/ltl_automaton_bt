@@ -17,10 +17,9 @@
 #include "navigation_node.h"
 #include <yaml-cpp/yaml.h>
 #include <ros/package.h>
-#include "quadruped_ctrl/locomotion_status.h"
-#include "ltl_automation_a1/LTLTrace.h"
-#include "ltl_automation_a1/LTLStateLoadDisturb.h"
-#include "ltl_automation_a1/LTLFakeInput.h"
+#include "ltl_automaton_bt/LTLTrace.h"
+#include "ltl_automaton_bt/LTLStateLoadDisturb.h"
+#include "ltl_automaton_bt/LTLFakeInput.h"
 
 typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> Client;
 
@@ -43,7 +42,7 @@ public:
     }
     ~LTLA1Planner() = default;
     void init_params(){
-        std::string package_name = "ltl_automation_a1";
+        std::string package_name = "ltl_automaton_bt";
         std::string package_name_2 = "ltl_automaton_planner";
         // Get default tree from param
         auto aaa = ros::package::getPath(package_name);
@@ -59,9 +58,6 @@ public:
 
         // Init ltl state message with TS
         ltl_state_msg_.ts_state.state_dimension_names = transition_system_["state_dim"].as<std::vector<std::string>>();
-
-        // Init locomotion status: 0: current_FSM; 1: operating mode
-//        loco_status = std::vector<std::string>(2, "NONE");
 
         // Initialize the flags for the replanning logic
         is_first = true;
@@ -127,7 +123,6 @@ public:
         my_blackboard_->set("action_sequence", "NONE");
         my_blackboard_->set("action_sequence_executed", "NONE");
         my_blackboard_->set("num_cycles", 1);
-//        my_blackboard_->set("locomotion_status", "NONE");
         my_blackboard_->set("replanning_request", 0);
         my_blackboard_->set("replanning_fake_input", 0);
         my_blackboard_->debugMessage();
@@ -385,8 +380,8 @@ public:
         my_blackboard_->set("ltl_state_current", current_ltl_state_);
     }
 
-    bool callbackLTLTrace(ltl_automation_a1::LTLTraceRequest &req,
-                          ltl_automation_a1::LTLTraceResponse &res){
+    bool callbackLTLTrace(ltl_automaton_bt::LTLTraceRequest &req,
+                          ltl_automaton_bt::LTLTraceResponse &res){
         if(req.request == 1){
             // Get the current action and TS state history
             BT::LTLState_Sequence state_trace;
@@ -423,8 +418,8 @@ public:
         return true;
     }
 
-    bool callbackLTLStateTrainingDisturb(ltl_automation_a1::LTLStateLoadDisturbRequest &req,
-                                     ltl_automation_a1::LTLStateLoadDisturbResponse &res){
+    bool callbackLTLStateTrainingDisturb(ltl_automaton_bt::LTLStateLoadDisturbRequest &req,
+                                     ltl_automaton_bt::LTLStateLoadDisturbResponse &res){
         if(req.request == 1){
             current_ltl_state_[1] = "standby";
             ROS_WARN("Load state changed to standby");
@@ -438,8 +433,8 @@ public:
         return true;
     }
 
-    bool callbackLTLFakeInput(ltl_automation_a1::LTLFakeInput::Request &req,
-                                         ltl_automation_a1::LTLFakeInput::Response &res){
+    bool callbackLTLFakeInput(ltl_automaton_bt::LTLFakeInput::Request &req,
+                                         ltl_automaton_bt::LTLFakeInput::Response &res){
 
         if(req.request < 4){
             fake_input_ = int(req.request);

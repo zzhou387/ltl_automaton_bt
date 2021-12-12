@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(ltl_automation_a1)
+project(ltl_automaton_bt)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -17,7 +17,6 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   behaviortree_cpp_v3
   nav_core
-  quadruped_ctrl
   message_generation
 )
 
@@ -146,9 +145,15 @@ include_directories(
 ## The recommended prefix ensures that target names across packages don't collide
 # add_executable(${PROJECT_NAME}_node src/ltl_automation_a1_node.cpp)
 
-add_executable(ltl_bt_interface_a1 src/ltl_bt_interface_a1.cpp)
+add_executable(ltl_bt_interface_mini_cheetah src/ltl_bt_interface_mini_cheetah.cpp)
 
-target_link_libraries(ltl_bt_interface_a1
+target_link_libraries(ltl_bt_interface_mini_cheetah
+  ${catkin_LIBRARIES} yaml-cpp
+)
+
+add_executable(ltl_bt_interface_turtlebot src/ltl_bt_interface_turtlebot.cpp)
+
+target_link_libraries(ltl_bt_interface_turtlebot
   ${catkin_LIBRARIES} yaml-cpp
 )
 
@@ -193,15 +198,7 @@ target_link_libraries(yaml_test
 
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
-catkin_install_python(PROGRAMS
-  nodes/ltl_automation_a1_node.py
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
 
-catkin_install_python(PROGRAMS
-        nodes/ltl_automation_a1_node2.py
-        DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
- )
 
 ## Mark executables for installation
 ## See http://docs.ros.org/melodic/api/catkin/html/howto/format1/building_executables.html
