@@ -554,6 +554,90 @@ public:
     }
 };
 
+class DropActionNew : public SyncActionNode
+{
+public:
+    DropActionNew(const std::string& name, const NodeConfiguration& config) : SyncActionNode(name, config)
+    {}
+
+    static PortsList providedPorts()
+    {
+        return { InputPort<std::string>("current_action"), InputPort<std::string>("bt_action_type"),
+                 BidirectionalPort<BT::LTLState>("ltl_state_current")};
+    }
+
+    NodeStatus tick() override
+    {
+        auto current_action = getInput<std::string>("current_action");
+        auto bt_action_type = getInput<std::string>("bt_action_type");
+        auto current_state = getInput<BT::LTLState>("ltl_state_current");
+        if(!current_action || current_action.value() == "NONE" ||
+           !bt_action_type || bt_action_type.value() == "NONE" ||
+           !current_state){
+            return NodeStatus::FAILURE;
+        }
+
+        if(bt_action_type.value() == "drop") {
+            // Do nothing
+            std::cout << name() << ": Drop action new" << current_action.value() << " Yield" << std::endl << std::endl;
+            auto updated_state = current_state.value();
+            if(updated_state[1] != "loaded"){
+                std::cout << "Current load state ERROR; shouldn't happen" << std::endl;
+                return NodeStatus::FAILURE;
+            }
+            updated_state[1] = "unloaded";
+            setOutput<BT::LTLState>("ltl_state_current", updated_state);
+            return NodeStatus::SUCCESS;
+        }else{
+            std::cout << name() << ": Wrong action type; Check the switch node" << std::endl << std::endl;
+            return NodeStatus::FAILURE;
+        }
+
+    }
+};
+
+class ResetAction : public SyncActionNode
+{
+public:
+    ResetAction(const std::string& name, const NodeConfiguration& config) : SyncActionNode(name, config)
+    {}
+
+    static PortsList providedPorts()
+    {
+        return { InputPort<std::string>("current_action"), InputPort<std::string>("bt_action_type"),
+                 BidirectionalPort<BT::LTLState>("ltl_state_current")};
+    }
+
+    NodeStatus tick() override
+    {
+        auto current_action = getInput<std::string>("current_action");
+        auto bt_action_type = getInput<std::string>("bt_action_type");
+        auto current_state = getInput<BT::LTLState>("ltl_state_current");
+        if(!current_action || current_action.value() == "NONE" ||
+           !bt_action_type || bt_action_type.value() == "NONE" ||
+           !current_state){
+            return NodeStatus::FAILURE;
+        }
+
+        if(bt_action_type.value() == "reset") {
+            // Do nothing
+            std::cout << name() << ": Reset action" << current_action.value() << " Yield" << std::endl << std::endl;
+            auto updated_state = current_state.value();
+            if(updated_state[1] != "unloaded"){
+                std::cout << "Current load state ERROR; shouldn't happen" << std::endl;
+                return NodeStatus::FAILURE;
+            }
+            updated_state[1] = "standby";
+            setOutput<BT::LTLState>("ltl_state_current", updated_state);
+            return NodeStatus::SUCCESS;
+        }else{
+            std::cout << name() << ": Wrong action type; Check the switch node" << std::endl << std::endl;
+            return NodeStatus::FAILURE;
+        }
+
+    }
+};
+
 class GuideAction : public SyncActionNode
 {
 public:
