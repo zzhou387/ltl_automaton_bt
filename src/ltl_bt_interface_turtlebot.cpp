@@ -46,7 +46,7 @@ public:
         std::string package_name_2 = "ltl_automaton_planner";
         // Get default tree from param
         auto aaa = ros::package::getPath(package_name);
-        bt_filepath = ros::package::getPath(package_name).append("/resources/replanning_tree_delivery_fake.xml");
+        bt_filepath = ros::package::getPath(package_name).append("/resources/replanning_tree_turtlebot_fake.xml");
 //        nh_.getParam("bt_filepath", bt_filepath);
         ROS_INFO("tree file: %s\n", bt_filepath.c_str());
 
@@ -74,11 +74,11 @@ public:
             auto dimension = transition_system_["state_dim"].as<std::vector<std::string>>()[i];
             if(dimension == "2d_pose_region"){
                 a1_region_sub_ = nh_.subscribe("current_region", 100, &LTLA1Planner::region_state_callback, this);
-            } else if (dimension == "DR_load") {
+            } else if (dimension == "turtlebot_load") {
                 // always initialize as unloaded for now
                 current_ltl_state_[i] = "standby";
             } else {
-                std::cout <<"state type " << dimension << " is not supported by DR TS" << std::endl;
+                std::cout <<"state type " << dimension << " is not supported by turtlebot TS" << std::endl;
             }
         }
 
@@ -102,7 +102,8 @@ public:
         factory_.registerNodeType<BTNav::StayAction>("StayAction");
         factory_.registerNodeType<BTNav::SynchronizedTransitionAction>("SynchronizedTransitionAction");
         factory_.registerNodeType<BTNav::PickAction>("PickAction");
-        factory_.registerNodeType<BTNav::DropAction>("DropAction");
+        factory_.registerNodeType<BTNav::DropActionNew>("DropActionNew");
+        factory_.registerNodeType<BTNav::ResetAction>("ResetAction");
         factory_.registerNodeType<BTNav::ReplanningRequestLevel1>("ReplanningRequestLevel1");
         factory_.registerNodeType<BTNav::ReplanningRequestLevel2>("ReplanningRequestLevel2");
         factory_.registerNodeType<BTNav::ReplanningRequestLevel3>("ReplanningRequestLevel3");
