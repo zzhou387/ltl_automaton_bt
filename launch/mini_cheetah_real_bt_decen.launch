@@ -3,8 +3,8 @@
   <!-- Arguments -->
   <arg name="agent_name" default="mini_cheetah"/>
   <arg name="plan_name" default="$(arg agent_name)/local_planner/action_plan"/>
-  <arg name="pose_x" default="0.0" />
-  <arg name="pose_y" default="0.0" />
+  <arg name="pose_x" default="0.0178523" />
+  <arg name="pose_y" default="1.2468818" />
   <arg name="init_yaw" default="0.0" />
   <arg name="world_file" default="$(env TURTLEBOT_GAZEBO_WORLD_FILE)"/>
 

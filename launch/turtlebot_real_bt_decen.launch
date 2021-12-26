@@ -17,7 +17,7 @@
 
   <!-- Run Turtlebot navigation -->
   <include file="$(find turtlebot_navigation)/launch/amcl_demo.launch">
-    <arg name="map_file" value="$(find turtlebot_navigation)/maps/marc_2.yaml"/>
+    <arg name="map_file" value="$(find turtlebot_navigation)/maps/gtmi_second_v2.yaml"/>
     <arg name="initial_pose_x" value="$(arg pose_x)"/>
     <arg name="initial_pose_y" value="$(arg pose_y)"/>
     <arg name="initial_pose_a" value="$(arg init_yaw)"/>
