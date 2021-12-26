@@ -11,7 +11,7 @@
   <rosparam command="load" file="$(find ltl_automaton_planner)/config/ltl_formula_gtmi.yaml" />
 
   <!-- Transition system for mobile robot-->
-  <param name="transition_system_$(arg agent_name)_textfile" type="str" textfile="$(find ltl_automaton_planner)/config/ts_$(arg agent_name)_test.yaml" />
+  <param name="transition_system_$(arg agent_name)_textfile" type="str" textfile="$(find ltl_automaton_planner)/config/ts_$(arg agent_name)_new.yaml" />
 
   <!-- Run mobile robot LTL node with the 2D pose region monitor-->
   <node name="$(arg agent_name)_region_2d_pose_monitor" pkg="ltl_automaton_std_transition_systems" type="region_2d_pose_monitor.py" output="screen" >
@@ -22,7 +22,7 @@
 
   <!-- Run Turtlebot navigation -->
   <include file="$(find turtlebot_navigation)/launch/amcl_demo.launch">
-    <arg name="map_file" value="$(find turtlebot_navigation)/maps/marc_2.yaml"/>
+    <arg name="map_file" value="$(find turtlebot_navigation)/maps/gtmi_second_v2.yaml"/>
     <arg name="initial_pose_x" value="$(arg pose_x)"/>
     <arg name="initial_pose_y" value="$(arg pose_y)"/>
     <arg name="initial_pose_a" value="$(arg init_yaw)"/>
