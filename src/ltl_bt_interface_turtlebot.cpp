@@ -52,9 +52,15 @@ public:
 
         // Get TS for param
         std::string ts_filepath;
-//        ts_filepath = ros::package::getPath(package_name_2).append("/config/ts_turtlebot_test.yaml");
-        nh_.getParam("transition_system_textfile", ts_filepath);
-        transition_system_ = YAML::LoadFile(ts_filepath);
+        if(nh_.getParam("transition_system_textfile", ts_filepath)){
+            ROS_INFO("Load TS from online parameter");
+            transition_system_ = YAML::Load(ts_filepath);
+        }else{
+            ROS_ERROR("Load TS from offline");
+            ts_filepath = ros::package::getPath(package_name_2).append("/config/ts_turtlebot_08_new.yaml");
+            transition_system_ = YAML::LoadFile(ts_filepath);
+        }
+
 
         // Init ltl state message with TS
         ltl_state_msg_.ts_state.state_dimension_names = transition_system_["state_dim"].as<std::vector<std::string>>();
