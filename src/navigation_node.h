@@ -623,7 +623,7 @@ public:
             // Do nothing
             std::cout << name() << ": Reset action" << current_action.value() << " Yield" << std::endl << std::endl;
             auto updated_state = current_state.value();
-            if(updated_state[1] != "unloaded"){
+            if(updated_state[1] == "standby"){
                 std::cout << "Current load state ERROR; shouldn't happen" << std::endl;
                 return NodeStatus::FAILURE;
             }
@@ -670,6 +670,48 @@ public:
                 return NodeStatus::FAILURE;
             }
             updated_state[1] = "training";
+            setOutput<BT::LTLState>("ltl_state_current", updated_state);
+            return NodeStatus::SUCCESS;
+        }else{
+            std::cout << name() << ": Wrong action type; Check the switch node" << std::endl << std::endl;
+            return NodeStatus::FAILURE;
+        }
+
+    }
+};
+
+class GuideActionNew : public SyncActionNode
+{
+public:
+    GuideActionNew(const std::string& name, const NodeConfiguration& config) : SyncActionNode(name, config)
+    {}
+
+    static PortsList providedPorts()
+    {
+        return { InputPort<std::string>("current_action"), InputPort<std::string>("bt_action_type"),
+                 BidirectionalPort<BT::LTLState>("ltl_state_current")};
+    }
+
+    NodeStatus tick() override
+    {
+        auto current_action = getInput<std::string>("current_action");
+        auto bt_action_type = getInput<std::string>("bt_action_type");
+        auto current_state = getInput<BT::LTLState>("ltl_state_current");
+        if(!current_action || current_action.value() == "NONE" ||
+           !bt_action_type || bt_action_type.value() == "NONE" ||
+           !current_state){
+            return NodeStatus::FAILURE;
+        }
+
+        if(bt_action_type.value() == "start_guiding") {
+            // Do nothing
+            std::cout << name() << ": Start guide mode" << current_action.value() << " Yield" << std::endl << std::endl;
+            auto updated_state = current_state.value();
+            if(updated_state[1] != "standby"){
+                std::cout << "Current environment-independent robot state ERROR; shouldn't happen" << std::endl;
+                return NodeStatus::FAILURE;
+            }
+            updated_state[1] = "guiding";
             setOutput<BT::LTLState>("ltl_state_current", updated_state);
             return NodeStatus::SUCCESS;
         }else{

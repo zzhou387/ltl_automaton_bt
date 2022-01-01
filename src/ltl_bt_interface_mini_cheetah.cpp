@@ -46,7 +46,7 @@ public:
         std::string package_name_2 = "ltl_automaton_planner";
         // Get default tree from param
         auto aaa = ros::package::getPath(package_name);
-        bt_filepath = ros::package::getPath(package_name).append("/resources/replanning_tree_turtlebot_fake.xml");
+        bt_filepath = ros::package::getPath(package_name).append("/resources/replanning_tree_mini_cheetah_fake.xml");
 //        nh_.getParam("bt_filepath", bt_filepath);
         ROS_INFO("tree file: %s\n", bt_filepath.c_str());
 
@@ -109,6 +109,7 @@ public:
         factory_.registerNodeType<BTNav::PickAction>("PickAction");
         factory_.registerNodeType<BTNav::DropActionNew>("DropActionNew");
         factory_.registerNodeType<BTNav::ResetAction>("ResetAction");
+        factory_.registerNodeType<BTNav::GuideActionNew>("GuideActionNew");
         factory_.registerNodeType<BTNav::ReplanningRequestLevel1>("ReplanningRequestLevel1");
         factory_.registerNodeType<BTNav::ReplanningRequestLevel2>("ReplanningRequestLevel2");
         factory_.registerNodeType<BTNav::ReplanningRequestLevel3>("ReplanningRequestLevel3");
@@ -222,7 +223,7 @@ public:
                             }
 
                             if (!sanity_check1) {
-                                ROS_ERROR("next_move_cmd not found in LTL A1 transition system");
+                                ROS_ERROR("next_move_cmd not found in LTL MC transition system");
                             }
 
                             move_action(action_dict);

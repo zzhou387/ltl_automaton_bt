@@ -3,6 +3,7 @@
   <!-- Arguments -->
   <arg name="agent_name" default="mini_cheetah"/>
   <arg name="plan_name" default="$(arg agent_name)/local_planner/action_plan"/>
+  <arg name="homing_name" default="$(arg agent_name)/local_planner/homing_action_plan"/>
   <arg name="pose_x" default="0.0178523" />
   <arg name="pose_y" default="1.2468818" />
   <arg name="init_yaw" default="0.0" />
@@ -34,6 +35,7 @@
 <!--    <remap from="/move_base" to="/$(arg agent_name)/move_base" />-->
     <remap from="current_region" to="$(arg agent_name)/current_region" />
     <remap from="/action_plan" to="$(arg plan_name)" />
+    <remap from="/homing_plan" to="$(arg homing_name)" />
     <remap from="ltl_trace" to="/$(arg agent_name)/ltl_trace"/>
     <remap from="synchronization_service" to="/$(arg agent_name)/synchronization_service"/>
     <remap from="replanning_request" to="/$(arg agent_name)/replanning_request"/>
