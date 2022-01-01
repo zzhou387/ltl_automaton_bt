@@ -291,6 +291,16 @@ public:
                 if(homing_activated) {
                     // send request to local planner for homing
                     // Get the current action and TS state history
+                    ros::Time begin = ros::Time::now();
+                    while(ros::Time::now().toSec() - begin.toSec() < 5 && homing_activated){
+                        ROS_WARN("Waiting for possible replanning/reallocation before executing homing");
+                        ros::spinOnce();
+                        loop_rate.sleep();
+                    }
+                    if(!homing_activated){
+                        continue;
+                    }
+
                     BT::LTLAction_Sequence act_trace;
                     my_blackboard_->get(std::string("action_sequence_executed"), act_trace);
 
@@ -309,6 +319,14 @@ public:
                     replanning_request_.publish(replanning_status);
 
                 }
+
+                while(homing_activated && !homing){
+                    ROS_WARN("Waiting for homing action sequence");
+                    ros::spinOnce();
+                    loop_rate.sleep();
+                }
+
+                homing_activated = false;
             }
 
             // Publish ltl current state back to the ltl planner
@@ -329,6 +347,7 @@ public:
     void callbackActionSequence(const ltl_automaton_msgs::LTLPlan& msg){
         // The xml changes go here
         homing = false;
+        homing_activated = false;
         auto action = msg.action_sequence;
         auto ts_state = msg.ts_state_sequence;
         BT::LTLState_Sequence desired_state_seq;

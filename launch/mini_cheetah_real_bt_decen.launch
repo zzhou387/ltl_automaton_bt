@@ -21,7 +21,7 @@
     <remap from="current_region" to="$(arg agent_name)/current_region" />
   </node>
 
-  <!-- Run Turtlebot navigation -->
+  <!-- Run Mini Cheetah navigation -->
   <include file="$(find mc_navigation)/launch/mc_navigation.launch">
     <arg name="map_file" value="$(find mc_navigation)/maps/gtmi_second_v2.yaml"/>
     <arg name="initial_pose_x" value="$(arg pose_x)"/>

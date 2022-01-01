@@ -30,6 +30,7 @@ public:
     LTLA1Planner(){
         client_ = std::make_shared<Client>("/move_base", true);
         task_sub_ = nh_.subscribe("/action_plan", 1, &LTLA1Planner::callbackActionSequence, this);
+        homing_task_sub_ = nh_.subscribe("/homing_plan", 1, &LTLA1Planner::callbackHomingActionSequence, this);
         ltl_state_pub_ = nh_.advertise<ltl_automaton_msgs::TransitionSystemStateStamped>("/ts_state", 10, true);
         replanning_request_ = nh_.advertise<std_msgs::Int8>("replanning_request", 1);
         ltl_trace_pub_ = nh_.advertise<ltl_automaton_msgs::LTLPlan>("ltl_trace", 10, true);
@@ -234,25 +235,31 @@ public:
                 int replanning_stat;
                 my_blackboard_->get(std::string("replanning_request"), replanning_stat);
                 replanning_status.data = replanning_stat;
-                if(replanning_status.data != 0){
-                    // Get the current action and TS state history
-                    BT::LTLState_Sequence state_trace;
-                    my_blackboard_->get(std::string("ltl_state_executed_sequence"), state_trace);
-                    BT::LTLAction_Sequence  act_trace;
-                    my_blackboard_->get(std::string("action_sequence_executed"), act_trace);
+                if(!homing) {
+                    if (replanning_status.data != 0) {
+                        // Get the current action and TS state history
+                        BT::LTLState_Sequence state_trace;
+                        my_blackboard_->get(std::string("ltl_state_executed_sequence"), state_trace);
+                        BT::LTLAction_Sequence act_trace;
+                        my_blackboard_->get(std::string("action_sequence_executed"), act_trace);
 
-                    // Publish the current action and TS state history
-                    ltl_trace_msg_.header.stamp = ros::Time::now();
-                    ltl_trace_msg_.action_sequence = act_trace;
-                    ltl_trace_msg_.ts_state_sequence.clear();
-                    for(const auto& state_0 : state_trace){
-                        ltl_automaton_msgs::TransitionSystemState s;
-                        s.state_dimension_names = transition_system_["state_dim"].as<std::vector<std::string>>();
-                        s.states = state_0;
-                        ltl_trace_msg_.ts_state_sequence.push_back(s);
+                        // Publish the current action and TS state history
+                        ltl_trace_msg_.header.stamp = ros::Time::now();
+                        ltl_trace_msg_.action_sequence = act_trace;
+                        ltl_trace_msg_.ts_state_sequence.clear();
+                        for (const auto &state_0 : state_trace) {
+                            ltl_automaton_msgs::TransitionSystemState s;
+                            s.state_dimension_names = transition_system_["state_dim"].as<std::vector<std::string>>();
+                            s.states = state_0;
+                            ltl_trace_msg_.ts_state_sequence.push_back(s);
+                        }
+                        ltl_trace_pub_.publish(ltl_trace_msg_);
+                        replanning_request_.publish(replanning_status);
                     }
-                    ltl_trace_pub_.publish(ltl_trace_msg_);
-                    replanning_request_.publish(replanning_status);
+                }else{
+                    if (replanning_status.data != 0) {
+                        ROS_ERROR("Failure during homing; need assistance from operator!");
+                    }
                 }
             }
             else if (status == NodeStatus::FAILURE || status == NodeStatus::SUCCESS){
@@ -268,6 +275,56 @@ public:
                     state_trace.push_back(current_ltl_state_);
                     my_blackboard_->set("ltl_state_executed_sequence", state_trace);
                 }
+
+                if(status == NodeStatus::SUCCESS && homing) {
+                    homing_activated = false;
+                }else if(status == NodeStatus::SUCCESS && !homing){
+                    homing_activated = true;
+                }else if(status == NodeStatus::FAILURE && homing) {
+                    homing_activated = false;
+                }else if(status == NodeStatus::FAILURE && !homing && replanning_status.data != 1) {
+                    homing_activated = true;
+                }
+                // Start homing if no new action plan is received for five seconds
+                if(homing_activated) {
+                    // send request to local planner for homing
+                    // Get the current action and TS state history
+                    ros::Time begin = ros::Time::now();
+                    while(ros::Time::now().toSec() - begin.toSec() < 5 && homing_activated){
+                        ROS_WARN("Waiting for possible replanning/reallocation before executing homing");
+                        ros::spinOnce();
+                        loop_rate.sleep();
+                    }
+                    if(!homing_activated){
+                        continue;
+                    }
+
+                    BT::LTLAction_Sequence act_trace;
+                    my_blackboard_->get(std::string("action_sequence_executed"), act_trace);
+
+                    // Publish the current action and TS state history
+                    ltl_trace_msg_.header.stamp = ros::Time::now();
+                    ltl_trace_msg_.action_sequence = act_trace;
+                    ltl_trace_msg_.ts_state_sequence.clear();
+                    for (const auto &state_0 : state_trace) {
+                        ltl_automaton_msgs::TransitionSystemState s;
+                        s.state_dimension_names = transition_system_["state_dim"].as<std::vector<std::string>>();
+                        s.states = state_0;
+                        ltl_trace_msg_.ts_state_sequence.push_back(s);
+                    }
+                    ltl_trace_pub_.publish(ltl_trace_msg_);
+                    replanning_status.data = 4;
+                    replanning_request_.publish(replanning_status);
+
+                }
+
+                while(homing_activated && !homing){
+                    ROS_WARN("Waiting for homing action sequence");
+                    ros::spinOnce();
+                    loop_rate.sleep();
+                }
+
+                homing_activated = false;
             }
 
             // Publish ltl current state back to the ltl planner
@@ -287,6 +344,8 @@ public:
 
     void callbackActionSequence(const ltl_automaton_msgs::LTLPlan& msg){
         // The xml changes go here
+        homing = false;
+        homing_activated = false;
         auto action = msg.action_sequence;
         auto ts_state = msg.ts_state_sequence;
         BT::LTLState_Sequence desired_state_seq;
@@ -341,6 +400,69 @@ public:
         my_blackboard_->set("action_sequence", action_sequence);
         my_blackboard_->set("ltl_state_executed_sequence", executed_state_seq);
         my_blackboard_->set("action_sequence_executed", executed_action_sequence);
+        my_blackboard_->set("current_action", current_action);
+        my_blackboard_->set("bt_action_type", bt_action_type);
+        my_blackboard_->set("num_cycles", num_cycles);
+        my_blackboard_->set("replanning_request", 0);
+        my_blackboard_->set("replanning_fake_input", 0);
+
+        // TODO: Add if statement based on the current tree status
+        if(replan){
+            ROS_ERROR("FATAL ERROR; REPLAN FLAG HAS TO BE FALSE TO GET READY FOR NEW PLAN");
+        }
+        replan = true;
+    }
+
+    void callbackHomingActionSequence(const ltl_automaton_msgs::LTLPlan& msg){
+        // The xml changes go here
+        homing = true;
+        auto action = msg.action_sequence;
+        auto ts_state = msg.ts_state_sequence;
+        BT::LTLState_Sequence desired_state_seq;
+        BT::LTLAction_Sequence action_sequence;
+        desired_state_seq.reserve(ts_state.size());
+        action_sequence.reserve(action.size());
+        for(const auto& state : ts_state){
+            desired_state_seq.push_back(state.states);
+        }
+        for(const auto& act : action){
+            action_sequence.push_back(act);
+        }
+
+        int num_cycles = action_sequence.size();
+        bool sanity_check1 = false;
+        YAML::Node action_dict;
+        std::string bt_action_type;
+        std::string current_action;
+        // Check the first action to be executed
+        if(!action_sequence.empty()){
+            current_action = action_sequence[0];
+            for (YAML::const_iterator iter = transition_system_["actions"].begin();
+                 iter != transition_system_["actions"].end(); ++iter) {
+                if (iter->first.as<std::string>() == current_action) {
+                    action_dict = transition_system_["actions"][iter->first.as<std::string>()];
+                    bt_action_type = action_dict["type"].as<std::string>();
+                    sanity_check1 = true;
+                    break;
+                }
+            }
+
+            // Check the synchronization only action; no need to run the tree
+            if(action_sequence.size() == 1){
+                if(bt_action_type == "stay"){
+                    num_cycles = 0;
+                }
+            }
+        } else {
+            sanity_check1 = true;
+        }
+
+        if (!sanity_check1) {
+            ROS_ERROR("The first action from LTL planner not found in mobile transition system");
+        }
+
+        my_blackboard_->set("ltl_state_desired_sequence", desired_state_seq);
+        my_blackboard_->set("action_sequence", action_sequence);
         my_blackboard_->set("current_action", current_action);
         my_blackboard_->set("bt_action_type", bt_action_type);
         my_blackboard_->set("num_cycles", num_cycles);
@@ -472,6 +594,7 @@ private:
     YAML::Node transition_system_;
 
     ros::Subscriber task_sub_;
+    ros::Subscriber homing_task_sub_;
     ros::Subscriber a1_region_sub_;
     ros::Publisher ltl_state_pub_;
     ros::Publisher ltl_trace_pub_;
@@ -481,6 +604,8 @@ private:
 
     bool is_first;
     bool replan;
+    bool homing = false;
+    bool homing_activated = false;
 
     int plan_index = 0;
 };
