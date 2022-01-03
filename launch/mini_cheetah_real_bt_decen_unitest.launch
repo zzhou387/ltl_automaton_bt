@@ -8,11 +8,6 @@
   <arg name="pose_y" default="1.2468818" />
   <arg name="init_yaw" default="0.0" />
 
-  <rosparam command="load" file="$(find ltl_automaton_planner)/config/ltl_formula_gtmi.yaml" />
-
-  <!-- Transition system for mobile robot-->
-  <param name="transition_system_$(arg agent_name)_textfile" type="str" textfile="$(find ltl_automaton_planner)/config/ts_$(arg agent_name)_new.yaml" />
-
   <!-- Run mobile robot LTL node with the 2D pose region monitor-->
   <node name="$(arg agent_name)_region_2d_pose_monitor" pkg="ltl_automaton_std_transition_systems" type="region_2d_pose_monitor.py" output="screen" >
     <remap from="transition_system_textfile" to="transition_system_$(arg agent_name)_textfile" />
@@ -43,9 +38,9 @@
   </node>
 
   <!-- Run local LTL planner node -->
-  <node name="$(arg agent_name)_local_ltl_planner" pkg="ltl_automaton_planner" type="local_planner_node.py" output="screen" >
-    <param name="robot_name" value="$(arg agent_name)" />
-  </node>
+<!--  <node name="$(arg agent_name)_local_ltl_planner" pkg="ltl_automaton_planner" type="local_planner_node_unitest.py" output="screen" >-->
+<!--    <param name="robot_name" value="$(arg agent_name)" />-->
+<!--  </node>-->
 
 <!--   <include file="$(find turtlebot_rviz_launchers)/launch/view_navigation.launch" /> -->
 
